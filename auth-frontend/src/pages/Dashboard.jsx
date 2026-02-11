@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import axios from "axios";
 import { FaSignOutAlt, FaUserCircle } from "react-icons/fa";
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  // const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         await axios.get("/dashboard");
+        // setDashboardData(response.data); // Removed unused variable
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
         if (error.response?.status === 401) {

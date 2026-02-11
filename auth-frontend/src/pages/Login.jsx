@@ -5,7 +5,7 @@ import * as yup from "yup";
 import { Link, useNavigate } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import { FaGoogle, FaFacebook, FaGithub } from "react-icons/fa";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import InputField from "../components/InputField";
 
 const loginSchema = yup.object({
@@ -22,28 +22,16 @@ const loginSchema = yup.object({
 
 const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [showSignup, setShowSignup] = useState(false);
-  const { login, register } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const {
     register: formRegister,
     handleSubmit,
     formState: { errors },
-    reset,
   } = useForm({
-    resolver: yupResolver(showSignup ? registerSchema : loginSchema),
+    resolver: yupResolver(loginSchema),
     mode: "onChange",
-  });
-
-  const registerSchema = yup.object({
-    name: yup.string().required("Name is required"),
-    email: yup.string().email().required(),
-    password: yup.string().min(6).required(),
-    confirmPassword: yup
-      .string()
-      .oneOf([yup.ref("password"), null], "Passwords must match")
-      .required("Please confirm your password"),
   });
 
   const handleLogin = async (data) => {
@@ -59,27 +47,11 @@ const Login = () => {
     setIsLoading(false);
   };
 
-  const handleRegister = async (data) => {
-    setIsLoading(true);
-    const result = await register(data.name, data.email, data.password);
-
-    if (result.success) {
-      toast.success("Registration successful!");
-      setTimeout(() => navigate("/dashboard"), 1000);
-    } else {
-      toast.error(result.error);
-    }
-    setIsLoading(false);
-  };
-
   const handleSocialLogin = (provider) => {
     toast.info(
       `${provider} login integration - Configure your OAuth credentials`,
     );
-    // Implement OAuth integration here
   };
-
-  const onSubmit = showSignup ? handleRegister : handleLogin;
 
   return (
     <div className="login-container">
@@ -90,28 +62,11 @@ const Login = () => {
         style={{ maxWidth: "450px", width: "100%" }}
       >
         <div className="text-center mb-4">
-          <h2 className="fw-bold">
-            {showSignup ? "Create Account" : "Welcome Back"}
-          </h2>
-          <p className="text-muted">
-            {showSignup
-              ? "Sign up to get started"
-              : "Please sign in to your account"}
-          </p>
+          <h2 className="fw-bold">Welcome Back</h2>
+          <p className="text-muted">Please sign in to your account</p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
-          {showSignup && (
-            <InputField
-              label="Full Name"
-              name="name"
-              placeholder="Enter your full name"
-              register={formRegister}
-              errors={errors}
-              validation={{ required: true }}
-            />
-          )}
-
+        <form onSubmit={handleSubmit(handleLogin)}>
           <InputField
             type="email"
             label="Email Address"
@@ -132,36 +87,22 @@ const Login = () => {
             validation={{ required: true }}
           />
 
-          {showSignup && (
-            <InputField
-              type="password"
-              label="Confirm Password"
-              name="confirmPassword"
-              placeholder="Confirm your password"
-              register={formRegister}
-              errors={errors}
-              validation={{ required: true }}
-            />
-          )}
-
-          {!showSignup && (
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <div className="form-check">
-                <input
-                  type="checkbox"
-                  className="form-check-input"
-                  id="rememberMe"
-                  {...formRegister("rememberMe")}
-                />
-                <label className="form-check-label" htmlFor="rememberMe">
-                  Remember me
-                </label>
-              </div>
-              <Link to="/forgot-password" className="text-decoration-none">
-                Forgot password?
-              </Link>
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <div className="form-check">
+              <input
+                type="checkbox"
+                className="form-check-input"
+                id="rememberMe"
+                {...formRegister("rememberMe")}
+              />
+              <label className="form-check-label" htmlFor="rememberMe">
+                Remember me
+              </label>
             </div>
-          )}
+            <Link to="/forgot-password" className="text-decoration-none">
+              Forgot password?
+            </Link>
+          </div>
 
           <button
             type="submit"
@@ -175,28 +116,20 @@ const Login = () => {
                   role="status"
                   aria-hidden="true"
                 ></span>
-                {showSignup ? "Creating Account..." : "Signing In..."}
+                Signing In...
               </>
-            ) : showSignup ? (
-              "Sign Up"
             ) : (
               "Sign In"
             )}
           </button>
 
-          <div className="text-center mb-3">
-            <button
-              type="button"
-              className="btn btn-link text-decoration-none"
-              onClick={() => {
-                setShowSignup(!showSignup);
-                reset();
-              }}
-            >
-              {showSignup
-                ? "Already have an account? Sign In"
-                : "Don't have an account? Sign Up"}
-            </button>
+          <div className="text-center mb-4">
+            <p className="mb-0">
+              Don't have an account?{" "}
+              <Link to="/register" className="text-decoration-none fw-semibold">
+                Create Account
+              </Link>
+            </p>
           </div>
 
           <div className="position-relative text-center mb-3">
