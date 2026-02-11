@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from "react";
+import { createContext, useState, useEffect } from "react";
 import axios from "axios";
-import { AuthContext } from "./AuthContext";
 
-export const AuthProvider = ({ children }) => {
+// Create the context
+const AuthContext = createContext();
+
+// Export the provider component
+const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -56,10 +59,30 @@ export const AuthProvider = ({ children }) => {
         email,
         password,
       });
-      setUser(response.data.user);
-      setIsAuthenticated(true);
-      return { success: true, data: response.data };
+
+      if (response.data.success) {
+        setUser(response.data.user);
+        setIsAuthenticated(true);
+        return {
+          success: true,
+          data: response.data,
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data.message || "Registration failed",
+        };
+      }
     } catch (error) {
+      // Handle validation errors from backend
+      if (error.response?.data?.errors) {
+        const firstError = error.response.data.errors[0];
+        return {
+          success: false,
+          error: firstError.message || "Validation error",
+        };
+      }
+
       return {
         success: false,
         error: error.response?.data?.message || "Registration failed",
@@ -77,18 +100,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated,
-        loading,
-        login,
-        register,
-        logout,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  const value = {
+    user,
+    isAuthenticated,
+    loading,
+    login,
+    register,
+    logout,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
+// Export both as named exports
+export { AuthContext, AuthProvider };
