@@ -1,46 +1,51 @@
 const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
-const { body, validationResult } = require("express-validator");
 const User = require("../models/User");
 
-// Validation middleware
-const validateRegistration = [
-  body("email").isEmail().normalizeEmail(),
-  body("password").isLength({ min: 6 }),
-  body("name").trim().notEmpty(),
-];
-
-const validateLogin = [
-  body("email").isEmail().normalizeEmail(),
-  body("password").notEmpty(),
-];
-
 // Register
-router.post("/register", validateRegistration, async (req, res) => {
+router.post("/register", async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
+    console.log("📝 Registration attempt:", req.body.email);
 
     const { email, password, name } = req.body;
 
+    // Basic validation
+    if (!email || !password || !name) {
+      return res.status(400).json({
+        message: "All fields are required",
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        message: "Password must be at least 6 characters",
+      });
+    }
+
     // Check if user exists
-    let user = await User.findOne({ email });
-    if (user) {
-      return res.status(400).json({ message: "User already exists" });
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(400).json({
+        message: "User already exists",
+      });
     }
 
     // Create new user
-    user = new User({ email, password, name });
+    const user = new User({
+      email: email.toLowerCase(),
+      password: password,
+      name: name.trim(),
+    });
+
     await user.save();
+    console.log("✅ User created:", user._id);
 
     // Create token
     const token = jwt.sign(
-      { userId: user._id, email: user.email },
+      { userId: user._id, email: user.email, name: user.name },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" },
+      { expiresIn: "24h" },
     );
 
     // Set cookie
@@ -48,45 +53,69 @@ router.post("/register", validateRegistration, async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 3600000, // 1 hour
+      maxAge: 24 * 60 * 60 * 1000,
     });
 
     res.status(201).json({
-      message: "User registered successfully",
-      user: { id: user._id, email: user.email, name: user.name },
+      success: true,
+      message: "Registration successful",
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+      },
+      token,
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+    console.error("❌ Registration error:", error);
+
+    // Handle duplicate key error
+    if (error.code === 11000) {
+      return res.status(400).json({
+        message: "User already exists",
+      });
+    }
+
+    res.status(500).json({
+      message: "Registration failed. Please try again.",
+    });
   }
 });
 
 // Login
-router.post("/login", validateLogin, async (req, res) => {
+router.post("/login", async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
+    console.log("📝 Login attempt:", req.body.email);
 
     const { email, password, rememberMe } = req.body;
 
+    // Basic validation
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Email and password are required",
+      });
+    }
+
     // Find user
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.status(400).json({
+        message: "Invalid credentials",
+      });
     }
 
     // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.status(400).json({
+        message: "Invalid credentials",
+      });
     }
 
-    // Create token with expiration based on rememberMe
-    const tokenExpiry = rememberMe ? "7d" : "1h";
+    // Create token
+    const tokenExpiry = rememberMe ? "7d" : "24h";
     const token = jwt.sign(
-      { userId: user._id, email: user.email },
+      { userId: user._id, email: user.email, name: user.name },
       process.env.JWT_SECRET,
       { expiresIn: tokenExpiry },
     );
@@ -96,24 +125,36 @@ router.post("/login", validateLogin, async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: rememberMe ? 7 * 24 * 3600000 : 3600000,
+      maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000,
     });
 
+    console.log("✅ Login successful:", user.email);
+
     res.json({
+      success: true,
       message: "Login successful",
-      user: { id: user._id, email: user.email, name: user.name },
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+      },
       token,
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+    console.error("❌ Login error:", error);
+    res.status(500).json({
+      message: "Login failed. Please try again.",
+    });
   }
 });
 
 // Logout
 router.post("/logout", (req, res) => {
   res.clearCookie("token");
-  res.json({ message: "Logged out successfully" });
+  res.json({
+    success: true,
+    message: "Logged out successfully",
+  });
 });
 
 // Check auth status
@@ -131,7 +172,14 @@ router.get("/status", async (req, res) => {
       return res.json({ isAuthenticated: false });
     }
 
-    res.json({ isAuthenticated: true, user });
+    res.json({
+      isAuthenticated: true,
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+      },
+    });
   } catch (error) {
     res.json({ isAuthenticated: false });
   }
