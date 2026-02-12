@@ -10,10 +10,30 @@ const { apiLimiter, authLimiter } = require("./middleware/rateLimiter");
 const authRoutes = require("./routes/auth");
 const dashboardRoutes = require("./routes/dashboard");
 
+const morgan = require("morgan");
+const requestLogger = require("./middleware/loggerMiddleware");
+const logger = require("./utils/logger");
+
+// Create logs directory
+const fs = require("fs");
+if (!fs.existsSync("./logs")) {
+  fs.mkdirSync("./logs");
+}
+
 const app = express();
 
-// Middleware
+// Security middleware
 app.use(helmet());
+
+// HTTP request logging
+app.use(
+  morgan("combined", {
+    stream: { write: (message) => logger.info(message.trim()) },
+  }),
+);
+app.use(requestLogger);
+
+// Middleware
 app.use(express.json());
 app.use(cookieParser());
 app.use(
