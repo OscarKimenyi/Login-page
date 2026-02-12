@@ -4,12 +4,16 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 require("dotenv").config();
 
+const helmet = require("helmet");
+const { apiLimiter, authLimiter } = require("./middleware/rateLimiter");
+
 const authRoutes = require("./routes/auth");
 const dashboardRoutes = require("./routes/dashboard");
 
 const app = express();
 
 // Middleware
+app.use(helmet());
 app.use(express.json());
 app.use(cookieParser());
 app.use(
@@ -22,10 +26,12 @@ app.use(
 // Database connection
 mongoose
   .connect(process.env.MONGODB_URI)
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => console.error("❌ MongoDB connection error:", err));
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => console.error("MongoDB connection error:", err));
 
 // Routes
+app.use("/api/", apiLimiter);
+app.use("/api/auth/", authLimiter);
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 
