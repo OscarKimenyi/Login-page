@@ -19,10 +19,26 @@ const userSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  isVerified: {
+    type: Boolean,
+    default: false,
+  },
+  verificationToken: String,
+  verificationTokenExpires: Date,
+  passwordResetToken: String,
+  passwordResetExpires: Date,
+  failedLoginAttempts: {
+    type: Nummber,
+    default: 0,
+  },
+  lockUntil: Date,
+  refreshToken: String,
+  refreshTokenExpires: Date,
   createdAt: {
     type: Date,
     default: Date.now,
   },
+  lastLogin: Date,
 });
 
 // Hash password before saving - THIS WORKS 100%
@@ -38,4 +54,8 @@ userSchema.methods.comparePassword = function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
+// Check if account is locked
+userSchema.methods.isLocked = function () {
+  return this.lockUntil && this.lockUntil > Date.now();
+};
 module.exports = mongoose.model("User", userSchema);
